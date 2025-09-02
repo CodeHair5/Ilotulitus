@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Raketin Laukaisu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000010;
+            color: #f0f0f0;
+            font-family: 'Inter', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-container {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        #launchButton {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 1rem 2.5rem;
+            border-radius: 0.75rem;
+            border: none;
+            color: white;
+            background: linear-gradient(45deg, #ff4b2b, #ff416c);
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4);
+            transition: all 0.3s ease-in-out;
+        }
+        #launchButton:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255, 65, 108, 0.6);
+        }
+        #launchButton:active {
+            transform: translateY(0);
+        }
+        #controls-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .control-group {
+            margin-bottom: 1rem;
+        }
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .control-group select {
+            width: 220px;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid #444;
+            background-color: #222;
+            color: #f0f0f0;
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="controls-container">
+        <div class="control-group">
+            <label for="fuel-select">1. Polttoaine</label>
+            <select id="fuel-select">
+                <option value="none">Ei valittu</option>
+                <option value="puujauhe">Puujauhe (Perus)</option>
+                <option value="hiili">Hiili (Pitkä hehku)</option>
+                <option value="rikki">Rikki (Keskitaso)</option>
+                <option value="magnesium">Magnesium (Kirkas välähdys)</option>
+                <option value="alumiini">Alumiini (Erittäin kirkas)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="oxidizer-select">2. Hapetin</label>
+            <select id="oxidizer-select">
+                <option value="none">Ei valittu</option>
+                <option value="kaliumnitraatti">Kaliumnitraatti (Paljon savua)</option>
+                <option value="kaliumperkloraatti">Kaliumperkloraatti (Tehokas)</option>
+                <option value="ammoniumperkloraatti">Ammoniumperkloraatti (Heikentää punaista)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="colorant-select">3. Värireagenssi</label>
+            <select id="colorant-select">
+                <option value="none">Ei valittu</option>
+                <option value="strontium">Strontiumkloridi (Punainen)</option>
+                <option value="litium">Litiumkarbonaatti (Punainen)</option>
+                <option value="kalsium">Kalsiumkloridi (Oranssi)</option>
+                <option value="natrium">Natriumnitraatti (Oranssi)</option>
+                <option value="barium">Bariumkloridi (Vihreä)</option>
+                <option value="kupari">Kuparikloridi (Sininen)</option>
+                <option value="titaani">Titaani (Valkoinen)</option>
+            </select>
+        </div>
+         <div class="control-group">
+            <label for="binder-select">4. Sideaine</label>
+            <select id="binder-select">
+                <option value="none">Ei valittu</option>
+                <option value="dekstriini">Dekstriini (Perussideaine)</option>
+                <option value="sellakka">Sellakka (Hidas palaminen)</option>
+                <option value="parafiini">Parafiini (Lisää savua, pitkä kesto)</option>
+                <option value="nitroselluloosa">Nitroselluloosa (Nopea reaktio)</option>
+                <option value="pvc">PVC (Vaikuttaa väriin)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="effect-select">5. Efekti</label>
+            <select id="effect-select">
+                <option value="piony">Piony (Salute)</option>
+                <option value="krysanteemi">Krysanteemi</option>
+                <option value="spider">Spider</option>
+                <option value="crossette">Crossette</option>
+                <option value="palmu">Palmu</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="ui-container">
+        <button id="launchButton">Laukaise raketti</button>
+    </div>
+    
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.132.2';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js';
+        import { EffectComposer } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/postprocessing/UnrealBloomPass.js';
+
+        // --- SHADER CODE FOR GLITTER EFFECT ---
+        const vertexShader = `
+            attribute float random;
+            uniform float u_time;
+            varying vec3 vColor;
+            varying float vRandom;
+            void main() {
+                vColor = color;
+                vRandom = random;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                float pulse = 1.0 + 0.15 * sin(u_time * 15.0 + vRandom * 10.0);
+                gl_PointSize = pulse * 2.5 * (300.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+        const fragmentShader = `
+            uniform float u_time;
+            uniform float u_opacity;
+            varying vec3 vColor;
+            varying float vRandom;
+            void main() {
+                float dist = distance(gl_PointCoord, vec2(0.5));
+                if (dist > 0.5) {
+                    discard;
+                }
+                
+                // Enhanced chaotic glitter
+                float wildTwinkle = 0.5 * (sin((u_time * 20.0) + vRandom * 30.0) + 1.0);
+                wildTwinkle = pow(wildTwinkle, 3.0);
+                float crackle = pow(fract(sin(u_time * 25.0 * vRandom) * 1000.0), 20.0);
+                float finalBrightness = max(wildTwinkle, crackle);
+
+                // Color over life: starts hot, cools to vColor
+                vec3 hotColor = vec3(1.0, 1.0, 0.9);
+                vec3 finalColor = mix(vColor, hotColor, pow(1.0 - u_opacity, 2.0));
+
+                float alpha = 1.0 - smoothstep(0.45, 0.5, dist);
+                gl_FragColor = vec4(finalColor * finalBrightness, u_opacity * alpha);
+            }
+        `;
+
+        // --- INGREDIENT DATA ---
+        const ingredients = {
+            fuel: {
+                'none':      { name: 'none', temp: 0, brightness: 0 },
+                'puujauhe':  { name: 'puujauhe', temp: 1000, brightness: 0.7 },
+                'hiili':     { name: 'hiili', temp: 1100, brightness: 0.8 },
+                'rikki':     { name: 'rikki', temp: 1200, brightness: 1.0 },
+                'magnesium': { name: 'magnesium', temp: 2500, brightness: 1.8 },
+                'alumiini':  { name: 'alumiini', temp: 3000, brightness: 2.5 }
+            },
+            oxidizer: {
+                'none': { name: 'none', power: 0, smoke: 0 },
+                'kaliumnitraatti': { name: 'kaliumnitraatti', power: 0.8, smoke: 0.9, colorEffect: {} },
+                'kaliumperkloraatti': { name: 'kaliumperkloraatti', power: 1.5, smoke: 0.2, colorEffect: {} },
+                'ammoniumperkloraatti': { name: 'ammoniumperkloraatti', power: 1.3, smoke: 0.7, colorEffect: { weaken: ['strontium', 'litium']} }
+            },
+            colorant: {
+                'none':      { name: 'none', color: new THREE.Color(0xffff00) }, // Weak yellow for dud
+                'strontium': { name: 'strontium', color: new THREE.Color(0xff2200) },
+                'barium':    { name: 'barium', color: new THREE.Color(0x00ff44) },
+                'kupari':    { name: 'kupari', color: new THREE.Color(0x0088ff) },
+                'natrium':   { name: 'natrium', color: new THREE.Color(0xffa500) },
+                'titaani':   { name: 'titaani', color: new THREE.Color(0xffffff) },
+                'kalsium':   { name: 'kalsium', color: new THREE.Color(0xff6600) },
+                'litium':    { name: 'litium', color: new THREE.Color(0xdd2222) }
+            },
+            binder: {
+                'none':            { name: 'none', duration: 0.2, speed: 1.0, colorModifier: false, producesSmoke: false },
+                'dekstriini':      { name: 'dekstriini', duration: 1.0, speed: 1.0, colorModifier: false, producesSmoke: false },
+                'sellakka':        { name: 'sellakka', duration: 1.3, speed: 0.8, colorModifier: false, producesSmoke: false },
+                'parafiini':       { name: 'parafiini', duration: 2.0, speed: 0.6, colorModifier: false, producesSmoke: true },
+                'nitroselluloosa': { name: 'nitroselluloosa', duration: 0.5, speed: 1.8, colorModifier: false, producesSmoke: false },
+                'pvc':             { name: 'pvc', duration: 1.0, speed: 1.0, colorModifier: true, producesSmoke: false }
+            },
+            effect: {
+                'piony':       { gravity: 0.002, drag: 1.0, life: 1.0, type: 'piony' },
+                'krysanteemi': { gravity: 0.008, drag: 0.97, life: 1.3, type: 'krysanteemi' },
+                'spider':      { gravity: 0.0001, drag: 1.0, life: 2.2, type: 'spider' },
+                'crossette':   { gravity: 0.002, drag: 1.0, life: 1.5, type: 'crossette' },
+                'palmu':       { gravity: 0.01, drag: 0.985, life: 1.6, type: 'palmu' }
+            }
+        };
+        
+        let currentFuel = ingredients.fuel.none;
+        let currentOxidizer = ingredients.oxidizer.none;
+        let currentColorant = ingredients.colorant.strontium;
+        let currentBinder = ingredients.binder.dekstriini;
+        let currentEffect = ingredients.effect.piony;
+
+        document.getElementById('fuel-select').addEventListener('change', (e) => currentFuel = ingredients.fuel[e.target.value]);
+        document.getElementById('oxidizer-select').addEventListener('change', (e) => currentOxidizer = ingredients.oxidizer[e.target.value]);
+        document.getElementById('colorant-select').addEventListener('change', (e) => currentColorant = ingredients.colorant[e.target.value]);
+        document.getElementById('binder-select').addEventListener('change', (e) => currentBinder = ingredients.binder[e.target.value]);
+        document.getElementById('effect-select').addEventListener('change', (e) => currentEffect = ingredients.effect[e.target.value]);
+
+        // --- SCENE SETUP ---
+        const scene = new THREE.Scene();
+        const baseBgColor = new THREE.Color(0x000010);
+        scene.background = baseBgColor.clone();
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        document.body.appendChild(renderer.domElement);
+        camera.position.set(0, 40, 100);
+
+        // --- POST-PROCESSING (BLOOM) ---
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.threshold = 0;
+        bloomPass.strength = 1.2;
+        bloomPass.radius = 0.5;
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- CAMERA CONTROLS ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; 
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 20;
+        controls.maxDistance = 200;
+        controls.target.set(0, 40, 0);
+
+        // --- AUDIO with Tone.js ---
+        let toneStarted = false;
+        const launchSynth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.3, sustain: 0 }}).toDestination();
+        const filter = new Tone.AutoFilter("4n").toDestination().start();
+        launchSynth.connect(filter);
+        filter.frequency.value = 200;
+        filter.octaves = 4;
+
+        const explosionSynth = new Tone.MembraneSynth().toDestination();
+        const explosionNoise = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 }}).toDestination();
+        const fizzleSynth = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.1, decay: 1.0, sustain: 0.1 }}).toDestination();
+        const crackleSynth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.05, sustain: 0 }}).toDestination();
+
+
+        function playLaunchSound() {
+            launchSynth.triggerAttack();
+            const now = Tone.now();
+            filter.frequency.setValueAtTime(200, now);
+            filter.frequency.linearRampToValueAtTime(1200, now + 1.5);
+        }
+        function playExplosionSound(power = 1.0, speed = 1.0) {
+            if (speed > 1.5) {
+                crackleSynth.volume.value = -5 + 10 * (speed - 1.5);
+                crackleSynth.triggerAttack();
+            }
+            explosionSynth.octaves = 5 + 10 * power;
+            explosionSynth.envelope.decay = 0.4 / speed;
+            explosionSynth.triggerAttackRelease("C1", "8n");
+            explosionNoise.volume.value = -10 + 10 * power;
+            explosionNoise.triggerAttackRelease("0.2");
+        }
+        function playFizzleSound() {
+            fizzleSynth.triggerAttackRelease("1.5");
+        }
+
+        // --- ENVIRONMENT ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.05));
+        createStars();
+
+        function createStars() {
+            const starGeometry = new THREE.BufferGeometry();
+            const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 });
+            const starVertices = [];
+            for (let i = 0; i < 10000; i++) {
+                starVertices.push((Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000);
+            }
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            scene.add(new THREE.Points(starGeometry, starMaterial));
+        }
+
+        // --- ROCKET ---
+        let rocket;
+        let isLaunching = false;
+        let isDud = false;
+        let rocketSpeed = 0.5; 
+        const explosionHeight = 100;
+        let trailParticles = [];
+        let flightSmokeParticles = [];
+        let explosions = [];
+        let smokes = [];
+        let skyFlashIntensity = 0;
+
+        function createRocket() {
+            const rocketGroup = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0, 1, 4, 32), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8, roughness: 0.2 }));
+            const nose = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2, 32), new THREE.MeshStandardMaterial({ color: 0xff416c, metalness: 0.5, roughness: 0.3 }));
+            nose.position.y = 3;
+            rocketGroup.add(body, nose);
+            rocketGroup.rotation.x = Math.PI;
+            rocketGroup.position.set(0, -50, 0); 
+            rocketGroup.scale.set(0.5, 0.5, 0.5);
+            return rocketGroup;
+        }
+        rocket = createRocket();
+        scene.add(rocket);
+
+        // --- PARTICLE SYSTEMS ---
+        class Explosion {
+            constructor(position, fuel, oxidizer, colorant, binder, effect) {
+                const power = fuel.brightness * oxidizer.power;
+                bloomPass.strength = 1.0 + Math.min(2.0, power);
+
+                let particleCount;
+                switch(effect.type) {
+                    case 'spider': particleCount = 500; break;
+                    case 'palmu': particleCount = 150; break;
+                    default: particleCount = 2000;
+                }
+
+                this.effect = effect;
+                this.popped = false;
+                
+                const particlesGeometry = new THREE.BufferGeometry();
+                const posArray = new Float32Array(particleCount * 3);
+                const colorArray = new Float32Array(particleCount * 3);
+                const randomArray = new Float32Array(particleCount);
+                
+                let mainColor = this.calculateColor(fuel, oxidizer, colorant);
+                const explosionColors = [mainColor];
+                if (power > 1.2) explosionColors.push(new THREE.Color(0xffffff));
+                if (power > 1.4) explosionColors.push(new THREE.Color(0xffff00));
+
+                this.velocities = [];
+
+                for (let i = 0; i < particleCount; i++) {
+                    posArray.set([position.x, position.y, position.z], i * 3);
+                    const color = explosionColors[Math.floor(Math.random() * explosionColors.length)];
+                    colorArray.set([color.r, color.g, color.b], i * 3);
+                    randomArray[i] = Math.random();
+
+                    const baseSpeed = (Math.random() * 0.5 + 0.1) * power;
+                    const speed = baseSpeed * binder.speed;
+                    const velocity = new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)).normalize().multiplyScalar(speed);
+                    
+                    if (effect.type === 'palmu') {
+                        velocity.y = Math.abs(velocity.y) * 1.5;
+                    }
+                    this.velocities.push(velocity);
+                }
+
+                particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+                particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+                particlesGeometry.setAttribute('random', new THREE.BufferAttribute(randomArray, 1));
+                
+                const shaderMaterial = new THREE.ShaderMaterial({
+                    uniforms: { u_time: { value: 0.0 }, u_opacity: { value: 1.0 } },
+                    vertexShader, fragmentShader,
+                    blending: THREE.AdditiveBlending, transparent: true, vertexColors: true
+                });
+
+                this.particleSystem = new THREE.Points(particlesGeometry, shaderMaterial);
+                this.life = 120 * binder.duration * effect.life; 
+                this.initialLife = this.life;
+                scene.add(this.particleSystem);
+            }
+
+            calculateColor(fuel, oxidizer, colorant) {
+                let color = colorant.color.clone();
+                if (oxidizer.colorEffect.weaken?.includes(colorant.name)) {
+                    color.lerp(new THREE.Color(0xffffff), 0.5);
+                }
+                if (fuel.temp > 2000 && colorant.name === 'kupari') {
+                    color.lerp(new THREE.Color(0xffffff), 0.7);
+                }
+                return color;
+            }
+
+            update() {
+                this.life--;
+                if (this.life <= 0) {
+                    scene.remove(this.particleSystem);
+                    this.particleSystem.geometry.dispose(); this.particleSystem.material.dispose();
+                    return false;
+                }
+
+                const lifeRatio = this.life / this.initialLife;
+                
+                if (this.effect.type === 'crossette' && !this.popped && lifeRatio < 0.6) {
+                    for (let i = 0; i < this.velocities.length; i++) {
+                       const popSpeed = (Math.random() * 0.5 + 0.5) * 0.8;
+                       const newPopVelocity = new THREE.Vector3((Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)).normalize().multiplyScalar(popSpeed);
+                       this.velocities[i].copy(newPopVelocity);
+                    }
+                    this.popped = true;
+                }
+
+                const positions = this.particleSystem.geometry.attributes.position.array;
+                for (let i = 0; i < this.velocities.length; i++) {
+                    positions[i * 3 + 0] += this.velocities[i].x;
+                    positions[i * 3 + 1] += this.velocities[i].y;
+                    positions[i * 3 + 2] += this.velocities[i].z;
+                    
+                    const vel = this.velocities[i];
+                    vel.y -= this.effect.gravity;
+                    vel.multiplyScalar(this.effect.drag);
+                }
+
+                this.particleSystem.geometry.attributes.position.needsUpdate = true;
+                this.particleSystem.material.uniforms.u_opacity.value = lifeRatio;
+                this.particleSystem.material.uniforms.u_time.value = performance.now() / 1000;
+                return true;
+            }
+        }
+        
+        class Smoke {
+            constructor(position, amount) {
+                const particleCount = 50 * amount;
+                const particlesGeometry = new THREE.BufferGeometry();
+                const posArray = new Float32Array(particleCount * 3);
+                this.velocities = [];
+
+                for (let i = 0; i < particleCount; i++) {
+                    posArray.set([
+                        position.x + (Math.random() - 0.5) * 5, position.y + (Math.random() - 0.5) * 5, position.z + (Math.random() - 0.5) * 5 ], i * 3);
+                    this.velocities.push(new THREE.Vector3((Math.random()-0.5)*0.05, Math.random()*0.1+0.02, (Math.random()-0.5)*0.05));
+                }
+                particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+                const particlesMaterial = new THREE.PointsMaterial({ size: 5, color: 0x888888, blending: THREE.NormalBlending, transparent: true, opacity: 0.2 });
+                this.particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
+                this.life = 250;
+                this.initialLife = this.life;
+                scene.add(this.particleSystem);
+            }
+            update() {
+                this.life--;
+                if (this.life <= 0) {
+                    scene.remove(this.particleSystem); this.particleSystem.geometry.dispose(); this.particleSystem.material.dispose();
+                    return false;
+                }
+                const positions = this.particleSystem.geometry.attributes.position.array;
+                for (let i = 0; i < this.velocities.length; i++) {
+                    positions[i*3] += this.velocities[i].x; positions[i*3+1] += this.velocities[i].y; positions[i*3+2] += this.velocities[i].z;
+                }
+                this.particleSystem.geometry.attributes.position.needsUpdate = true;
+                this.particleSystem.material.opacity = (this.life / this.initialLife) * 0.2;
+                return true;
+            }
+        }
+        
+        function createTrailParticle(dud = false) {
+            const color = dud ? 0xaaaaaa : 0xffd700;
+            const particle = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }));
+            particle.position.set(rocket.position.x, rocket.position.y - 2, rocket.position.z);
+            particle.life = dud ? 20 : 150;
+            scene.add(particle);
+            trailParticles.push(particle);
+        }
+
+        function createFlightSmokeParticle() {
+            const particle = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0x666666, transparent: true, opacity: 0.3 }));
+            particle.position.set(rocket.position.x + (Math.random() - 0.5), rocket.position.y - 3, rocket.position.z + (Math.random() - 0.5));
+            particle.life = 200;
+            particle.velocity = new THREE.Vector3((Math.random() - 0.5) * 0.02, 0.01, (Math.random() - 0.5) * 0.02);
+            scene.add(particle);
+            flightSmokeParticles.push(particle);
+        }
+        
+        // --- LAUNCH LOGIC & ANIMATION ---
+        document.getElementById('launchButton').addEventListener('click', async () => {
+            if (!toneStarted) { await Tone.start(); toneStarted = true; }
+            if (isLaunching) return;
+
+            isDud = currentFuel.name === 'none' || currentOxidizer.name === 'none';
+            isLaunching = true;
+            rocket.position.set(0, -50, 0); 
+            rocket.visible = true;
+            rocketSpeed = isDud ? 0.3 : 0.5;
+
+            if (isDud) {
+                playFizzleSound();
+            } else {
+                playLaunchSound();
+            }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update();
+
+            if (skyFlashIntensity > 0) {
+                skyFlashIntensity *= 0.9;
+                const flashColor = new THREE.Color(currentColorant.color).multiplyScalar(skyFlashIntensity);
+                scene.background.copy(baseBgColor).add(flashColor);
+            } else {
+                 scene.background.copy(baseBgColor);
+            }
+
+            if (isLaunching) {
+                rocket.position.y += rocketSpeed;
+                if (!isDud) rocketSpeed += 0.01; 
+                else rocketSpeed -= 0.01;
+
+                if (Math.random() < 0.9) createTrailParticle(isDud);
+
+                const shouldSmoke = !isDud && (currentBinder.producesSmoke || currentOxidizer.smoke > 0.8);
+                if (shouldSmoke && Math.random() < 0.5) {
+                    createFlightSmokeParticle();
+                }
+                
+                const endCondition = isDud ? rocketSpeed <= 0 : rocket.position.y >= explosionHeight;
+
+                if (endCondition) {
+                    if (!isDud) {
+                        const power = currentFuel.brightness * currentOxidizer.power;
+                        const speed = currentBinder.speed;
+                        explosions.push(new Explosion(rocket.position, currentFuel, currentOxidizer, currentColorant, currentBinder, currentEffect));
+                        
+                        const smokeAmount = (currentBinder.producesSmoke ? 1 : 0) + currentOxidizer.smoke;
+                        if (smokeAmount > 0) {
+                            smokes.push(new Smoke(rocket.position, smokeAmount));
+                        }
+                        playExplosionSound(power, speed);
+                        skyFlashIntensity = 0.5;
+                    }
+                    isLaunching = false;
+                    rocket.visible = false;
+                }
+            }
+
+            for (let i = trailParticles.length-1; i >= 0; i--) {
+                const p = trailParticles[i]; p.life--; p.material.opacity = p.life / 150; p.scale.multiplyScalar(0.98);
+                if (p.life <= 0) { scene.remove(p); p.geometry.dispose(); p.material.dispose(); trailParticles.splice(i, 1); }
+            }
+             for (let i = flightSmokeParticles.length-1; i >= 0; i--) {
+                const p = flightSmokeParticles[i]; 
+                p.life--; 
+                p.position.add(p.velocity);
+                p.material.opacity = (p.life / 200) * 0.3; 
+                p.scale.multiplyScalar(1.01);
+                if (p.life <= 0) { scene.remove(p); p.geometry.dispose(); p.material.dispose(); flightSmokeParticles.splice(i, 1); }
+            }
+            for (let i = explosions.length-1; i >= 0; i--) { if (!explosions[i].update()) { explosions.splice(i, 1); } }
+            for (let i = smokes.length-1; i >= 0; i--) { if (!smokes[i].update()) { smokes.splice(i, 1); } }
+            
+            composer.render();
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
